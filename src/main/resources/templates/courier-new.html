@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Новый курьер — КСтолу</title><link rel="stylesheet" href="/orders.css"></head>
+<body class="desk"><aside th:replace="~{desk-nav :: menu}"></aside>
+<main>
+<h1>Новый курьер</h1>
+<p class="message" role="alert" th:if="${error}" th:text="${error}"></p>
+<section class="panel">
+<form class="fields" th:action="@{/orders/couriers}" th:object="${courierInput}" method="post">
+  <label>Фамилия<input th:field="*{lastName}" required maxlength="60"></label>
+  <label>Имя<input th:field="*{firstName}" required maxlength="60"></label>
+  <label>Отчество<input th:field="*{patronymic}" required maxlength="60"></label>
+  <label>Телефон<input type="tel" th:field="*{phone}" required maxlength="25"></label>
+  <label>Возраст<input type="number" name="ageYears" th:value="${courierInput.ageYears == 0 ? null : courierInput.ageYears}" required min="1" max="120"></label>
+  <div class="search"><button>Сохранить курьера</button><a href="/orders/couriers">Отмена</a></div>
+</form>
+</section>
+</main></body></html>

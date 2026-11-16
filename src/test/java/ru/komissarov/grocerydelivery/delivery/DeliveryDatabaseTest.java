@@ -45,6 +45,30 @@ class DeliveryDatabaseTest extends PostgresTestSupport {
             Instant.now().plusSeconds(3600),"Позвонить перед приездом"));
     }
 
+    @Test void dispatcherCanCorrectAddressInDeliveryAndHistorySurvivesCompletion() {
+        long courier = courier("01");
+        service.startShift(manager, courier);
+        var original = order(AddressType.APARTMENT);
+        service.assignCourier(manager, original.id(), courier);
+        service.dispatch(manager, original.id(), true);
+        var correction = new AddressCorrection("Муром, ул. Лесная, д. 12А",
+            AddressType.PRIVATE_HOUSE, "Клиент уточнил адрес");
+
+        service.correctAddress(manager, original.id(), correction);
+        service.correctAddress(manager, original.id(), correction);
+        var updated = service.findOrder(manager, original.number()).orElseThrow();
+        assertEquals(correction.addressText(), updated.addressText());
+        assertEquals(AddressType.PRIVATE_HOUSE, updated.addressType());
+        assertEquals(OrderStatus.IN_DELIVERY, updated.status());
+        assertEquals(original.addressText(), jdbc.queryForObject(
+            "SELECT previous_address FROM order_address_changes WHERE order_id = ?", String.class, original.id()));
+        assertEquals(manager, jdbc.queryForObject(
+            "SELECT changed_by FROM order_address_changes WHERE order_id = ?", Long.class, original.id()));
+
+        service.completeOrder(manager, original.id());
+        assertThrows(IllegalStateException.class, () -> service.correctAddress(manager, original.id(), correction));
+    }
+
     @Test void completeLifecycleKeepsRegistrationShiftAndDeliverySeparate() {
         long c = courier("01");
         assertFalse(service.listCouriers(manager).getFirst().onShift());
@@ -88,14 +112,53 @@ class DeliveryDatabaseTest extends PostgresTestSupport {
         var o=order(AddressType.PRIVATE_HOUSE);service.completeOrder(manager,o.id());service.completeOrder(manager,o.id());
         assertEquals(1,jdbc.queryForObject("select count(*) from order_events where order_id=? and event_type='COMPLETED'",Integer.class,o.id()));
     }
-    @Test void duplicateShiftAndBusyCourierCannotBeAssignedTwice() {
-        long c=courier("01");service.startShift(manager,c);
-        assertThrows(IllegalStateException.class,()->service.startShift(manager,c));
-        var a=order(AddressType.APARTMENT);var b=order(AddressType.PRIVATE_HOUSE);
-        service.assignCourier(manager,a.id(),c);
-        assertThrows(IllegalStateException.class,()->service.assignCourier(manager,b.id(),c));
-        assertEquals(OrderStatus.NEW,service.findOrder(manager,b.number()).orElseThrow().status());
-        assertEquals(1,jdbc.queryForObject("select count(*) from order_events where order_id=?",Integer.class,b.id()));
+    @Test void courierCanReorderOrdersAndCloseShiftAfterFinishingBoth() {
+        long courier = courier("01");
+        service.startShift(manager, courier);
+        assertThrows(IllegalStateException.class, () -> service.startShift(manager, courier));
+        var first = order(AddressType.APARTMENT);
+        var second = order(AddressType.PRIVATE_HOUSE);
+        var unavailable = order(AddressType.APARTMENT);
+        service.completeOrder(manager, unavailable.id());
+        assertThrows(IllegalStateException.class,
+            () -> service.assignBatch(manager, courier, List.of(first.id(), unavailable.id())));
+        assertTrue(queueIds(courier).isEmpty());
+        service.assignBatch(manager, courier, List.of(first.id(), second.id()));
+        assertEquals(List.of(first.id(), second.id()), queueIds(courier));
+
+        service.moveInQueue(manager, courier, first.id(), false);
+        assertEquals(List.of(second.id(), first.id()), queueIds(courier));
+        service.moveInQueue(manager, courier, first.id(), true);
+        assertEquals(List.of(first.id(), second.id()), queueIds(courier));
+
+        service.completeOrder(manager, first.id());
+        assertEquals(List.of(second.id()), queueIds(courier));
+        assertThrows(IllegalStateException.class, () -> service.endShift(manager, courier));
+        service.completeOrder(manager, second.id());
+        service.endShift(manager, courier);
+        assertTrue(queueIds(courier).isEmpty());
+    }
+
+    @Test void dispatchesWholeQueueAndReportsOnlyDeliveredMileage() {
+        long courier = courier("01");
+        service.startShift(manager, courier);
+        var first = order(AddressType.APARTMENT);
+        var second = order(AddressType.PRIVATE_HOUSE);
+        service.assignBatch(manager, courier, List.of(first.id(), second.id()), true);
+        service.dispatchQueue(manager, courier);
+        assertTrue(service.courierQueue(manager, courier).stream()
+            .allMatch(order -> order.status() == OrderStatus.IN_DELIVERY));
+
+        service.markDelivered(manager, first.id(), 3400);
+        service.completeOrder(manager, second.id());
+        var summary = service.deliveryReport(manager, Instant.now().minusSeconds(60), Instant.now().plusSeconds(60)).getFirst();
+        assertEquals(1L, summary.delivered());
+        assertEquals(1L, summary.measured());
+        assertEquals(3400L, summary.meters());
+    }
+
+    private List<Long> queueIds(long courier) {
+        return service.courierQueue(manager, courier).stream().map(DeliveryViews.OrderView::id).toList();
     }
     @Test void databaseItselfRejectsDuplicateNumbersAndOpenShifts() {
         long c=courier("01");service.startShift(manager,c);var o=order(AddressType.APARTMENT);

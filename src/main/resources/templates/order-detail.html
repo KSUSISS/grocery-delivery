@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Карточка заказа — КСтолу</title><link rel="stylesheet" href="/orders.css"></head>
+<body class="desk"><aside th:replace="~{desk-nav :: menu}"></aside>
+<main>
+<h1 th:text="|Заказ № ${order.number}|"></h1>
+<p class="message" role="status" th:if="${notice}" th:text="${notice}"></p>
+<p class="message" role="alert" th:if="${error}" th:text="${error}"></p>
+<section class="panel">
+  <dl><dt>Получатель</dt><dd th:text="${order.recipientName}"></dd>
+  <dt>Телефон</dt><dd th:text="${order.recipientPhone}"></dd>
+  <dt>Адрес</dt><dd th:text="${order.addressText}"></dd>
+  <dt>Тип жилья</dt><dd th:text="${order.addressType.name() == 'APARTMENT' ? 'Квартира' : 'Частный дом'}"></dd>
+  <dt>Доставить к</dt><dd th:text="|${due} (МСК)|"></dd>
+  <dt>Комментарий</dt><dd th:text="${order.comment.isBlank() ? '—' : order.comment}"></dd></dl>
+</section>
+<section class="panel" th:if="${order.status.name() != 'COMPLETED'}">
+<h2>Исправить адрес</h2>
+<form class="fields" th:action="@{/orders/{number}/address(number=${order.number})}" method="post">
+  <label>Полный адрес<input name="addressText" required maxlength="500" th:value="${order.addressText}"></label>
+  <label>Тип жилья<select name="addressType" required>
+    <option value="APARTMENT" th:selected="${order.addressType.name() == 'APARTMENT'}">Квартира</option>
+    <option value="PRIVATE_HOUSE" th:selected="${order.addressType.name() == 'PRIVATE_HOUSE'}">Частный дом</option>
+  </select></label>
+  <label>Причина правки<input name="reason" required maxlength="500"></label>
+  <button>Сохранить адрес</button>
+</form>
+</section>
+<section class="panel" th:if="${order.status.name() != 'COMPLETED'}">
+<h2>Доставка</h2>
+<p th:if="${order.courierId != null}"><a href="/orders/couriers">Посмотреть очередь курьера</a></p>
+<p th:if="${order.status.name() == 'NEW'}"><a th:href="@{/orders/route(selected=${order.id})}">Выбрать заказы на карте</a></p>
+<form class="fields" th:if="${order.status.name() == 'IN_DELIVERY'}" th:action="@{/orders/{number}/delivered(number=${order.number})}" method="post">
+  <label>Фактический пробег до этого адреса, м (если известен)
+    <input type="number" name="meters" min="0" max="1000000" step="1">
+  </label>
+  <button>Отметить доставленным</button>
+</form>
+
+<form class="fields" th:if="${order.status.name() == 'ASSIGNED' and !couriers.isEmpty()}"
+      th:action="@{/orders/{number}/delivery(number=${order.number})}" method="post">
+    <label>Курьер на смене
+      <select name="courierId" required>
+        <option th:each="courier : ${couriers}" th:value="${courier.id}"
+                th:selected="${courier.id == order.courierId}"
+                th:text="|${courier.lastName} ${courier.firstName} ${courier.patronymic}|"></option>
+      </select>
+    </label>
+    <button name="action" value="assign">Назначить курьера</button>
+</form>
+<p th:if="${order.status.name() == 'NEW' and couriers.isEmpty()}">
+  <a href="/orders/couriers">Открой смену курьеру</a>, чтобы назначить заказ.
+</p>
+<p th:if="${order.status.name() == 'ASSIGNED'}"><a href="/orders">Отправить через курьера на главной</a></p>
+<form class="search" th:if="${order.status.name() != 'IN_DELIVERY'}" th:action="@{/orders/{number}/delivery(number=${order.number})}" method="post">
+  <button name="action" value="complete" class="secondary">Закрыть без доставки</button>
+</form>
+</section>
+</main></body></html>

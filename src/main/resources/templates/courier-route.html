@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>Маршрут — КСтолу</title>
+<link rel="stylesheet" href="/orders.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="anonymous" defer></script>
+<script src="/courier-route.js" defer></script>
+</head>
+<body class="desk"><aside th:replace="~{desk-nav :: menu}"></aside>
+<main>
+<h1>Маршрут по Мурому</h1>
+<p th:if="${!draft}" th:text="|${courier.lastName} ${courier.firstName} ${courier.patronymic}|"></p>
+<p th:if="${draft}">Собери маршрут и выбери курьера после проверки точек.</p>
+<p class="message" role="status" th:if="${notice}" th:text="${notice}"></p>
+<p class="message" role="alert" th:if="${error}" th:text="${error}"></p>
+<p class="message" role="alert" th:if="${routeError}" th:text="${routeError}"></p>
+
+<section class="panel" th:if="${draft or courier.onShift}">
+<h2>Выбрать заказы</h2>
+<p th:if="${options.isEmpty()}">Свободных заказов пока нет.</p>
+<form th:if="${!options.isEmpty()}" th:action="@{${routePath}}" method="get">
+  <div class="order-choices" data-order-choices>
+    <div class="order-choice" th:each="option : ${options}">
+      <button type="button" class="order-grip" th:aria-label="|Переместить заказ № ${option.number}|" title="Перетащи заказ или используй стрелки ↑ ↓">⠿</button>
+      <label>
+        <input type="checkbox" name="selected" th:value="${option.id}" th:checked="${selected.contains(option.id)}">
+        <span th:text="|№ ${option.number} · ${option.addressText}|"></span>
+      </label>
+    </div>
+  </div>
+  <button>Показать на карте</button>
+</form>
+<form th:if="${!selected.isEmpty() and (!draft or route != null)}" class="batch-confirm"
+      th:action="@{${routePath + '/assign'}}" method="post">
+  <input th:each="id : ${selected}" type="hidden" name="selected" th:value="${id}">
+  <label th:if="${draft and !availableCouriers.isEmpty()}">Свободный курьер на смене
+    <select name="chosenCourier" required>
+      <option value="">Выбрать курьера</option>
+      <option th:each="c : ${availableCouriers}" th:value="${c.id}" th:text="|${c.lastName} ${c.firstName}|"></option>
+    </select>
+  </label>
+  <p th:if="${draft and availableCouriers.isEmpty()}">Нет свободных курьеров на смене.</p>
+  <button th:disabled="${draft and availableCouriers.isEmpty()}" th:text="${draft ? 'Назначить маршрут' : 'Назначить выбранные'}"></button>
+</form>
+</section>
+<div id="route-map" role="region" aria-label="Карта маршрута по Мурому"></div>
+<p id="point-help" role="status">Для выбора точки нажми «Указать на карте» рядом с кафе или заказом, затем нажми на карту и сохрани точку.</p>
+<p th:if="${route != null}"><strong th:text="|Плановое расстояние с возвратом: ${#numbers.formatDecimal(route.distance / 1000, 1, 2)} км|"></strong></p>
+<p th:if="${route != null}" th:text="|Последняя точка → кафе: ${#numbers.formatDecimal(route.legs[stops.size()].distance / 1000, 1, 2)} км|"></p>
+<p th:if="${stops.isEmpty()}">Чтобы построить маршрут, назначь курьеру хотя бы один заказ.</p>
+<p th:if="${!stops.isEmpty() and route == null and routeError == null}">Сохрани точку кафе и точки всех заказов, чтобы построить маршрут.</p>
+
+<section class="panel">
+<h2>Кафе — старт и финиш</h2>
+<form class="point-form" th:action="@{${routePath + '/points'}}" method="post" data-stop="Кафе">
+<input th:each="id : ${selected}" type="hidden" name="selected" th:value="${id}">
+  <label>Широта<input name="latitude" type="number" step="any" min="-90" max="90" required th:value="${cafe?.latitude}"></label>
+  <label>Долгота<input name="longitude" type="number" step="any" min="-180" max="180" required th:value="${cafe?.longitude}"></label>
+  <button class="secondary pick-point" hidden type="button">Указать на карте</button>
+  <button>Сохранить точку кафе</button>
+</form>
+</section>
+
+<section class="panel" th:each="stop, index : ${stops}">
+<h2 th:text="|${index.count}. Заказ № ${stop.order.number}|"></h2>
+<form class="search" th:if="${stop.proposed}" th:action="@{${routePath + '/position'}}" method="post">
+  <input th:each="id : ${selected}" type="hidden" name="selected" th:value="${id}">
+  <input type="hidden" name="orderId" th:value="${stop.order.id}">
+  <button class="secondary" name="up" value="true" th:disabled="${selected.getFirst() == stop.order.id}">Выше</button>
+  <button class="secondary" name="up" value="false" th:disabled="${selected.getLast() == stop.order.id}">Ниже</button>
+</form>
+<form class="search" th:if="${!draft and !stop.proposed}" th:action="@{/orders/couriers/{id}/queue(id=${courier.id})}" method="post">
+  <input type="hidden" name="backToRoute" value="true">
+  <input type="hidden" name="orderId" th:value="${stop.order.id}">
+  <button class="secondary" name="up" value="true" th:disabled="${index.first}">Выше</button>
+  <button class="secondary" name="up" value="false" th:disabled="${index.last or stops[index.index + 1].proposed}">Ниже</button>
+</form>
+<p th:text="${stop.order.addressText}"></p>
+<p th:if="${stop.point == null}">Точка дома не найдена. Укажи ее на карте.</p>
+<p th:if="${route != null}" th:text="|От предыдущей точки: ${#numbers.formatDecimal(route.legs[index.index].distance / 1000, 1, 2)} км|"></p>
+<form class="point-form" th:action="@{${routePath + '/points'}}" method="post" th:data-stop="${index.count}">
+  <input type="hidden" name="orderId" th:value="${stop.order.id}">
+<input th:each="id : ${selected}" type="hidden" name="selected" th:value="${id}">
+  <label>Широта<input name="latitude" type="number" step="any" min="-90" max="90" required th:value="${stop.point?.latitude}"></label>
+  <label>Долгота<input name="longitude" type="number" step="any" min="-180" max="180" required th:value="${stop.point?.longitude}"></label>
+  <button class="secondary pick-point" hidden type="button">Указать на карте</button>
+  <button>Сохранить точку</button>
+</form>
+</section>
+<script th:inline="javascript">
+  window.kstoluRouteLine = /*[[${line}]]*/ null;
+</script>
+</main></body></html>

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Заказы — КСтолу</title><link rel="stylesheet" href="/orders.css"></head>
+<body class="desk"><aside th:replace="~{desk-nav :: menu}"></aside><main>
+<div class="courier-heading"><h1>Заказы</h1><a class="add-courier" href="/orders/new">Новый заказ</a></div>
+<p class="message" role="alert" th:if="${error}" th:text="${error}"></p>
+<p class="message" role="status" th:if="${notice}" th:text="${notice}"></p>
+<section class="panel shift-panel">
+  <h2>На смене</h2>
+  <p th:if="${shiftQueue.isEmpty()}">Пока никого. <a href="/orders/couriers">Открыть смену курьеру</a></p>
+  <div class="shift-cards">
+  <article th:each="entry : ${shiftQueue}" th:with="ready=${entry.queue.?[status.name() == 'ASSIGNED'].size()}">
+    <details th:if="${ready > 0}">
+      <summary><strong th:text="|${entry.courier.lastName} ${entry.courier.firstName}|"></strong> <span th:text="|К отправке: ${ready}|"></span></summary>
+      <form th:action="@{/orders/couriers/{id}/dispatch(id=${entry.courier.id})}" method="post">
+        <button>Отправить на заказы</button>
+      </form>
+      <a th:href="@{/orders/couriers/{id}/route(id=${entry.courier.id})}">Посмотреть маршрут</a>
+    </details>
+    <details th:if="${entry.returning}">
+      <summary><strong th:text="|${entry.courier.lastName} ${entry.courier.firstName}|"></strong> <span>Возврат требует пересчета</span></summary>
+      <form class="fields" th:action="@{/orders/couriers/{id}/return(id=${entry.courier.id})}" method="post">
+        <button>Пересчитать путь до кафе</button>
+      </form>
+    </details>
+    <div th:if="${ready == 0 and !entry.returning}">
+      <strong th:text="|${entry.courier.lastName} ${entry.courier.firstName}|"></strong>
+      <span th:text="${entry.queue.isEmpty() ? 'Свободен' : 'На доставке'}"></span>
+    </div>
+  </article>
+  </div>
+</section>
+<form class="search" th:action="@{/orders}" method="get">
+  <label>Поиск по номеру <input name="number" inputmode="numeric" maxlength="8" pattern="[1-9][0-9]{7}" placeholder="8 цифр" th:value="${number}"></label>
+  <button>Найти</button><a th:if="${!number.isEmpty()}" href="/orders">Сбросить</a>
+</form>
+<section class="panel" th:with="active=${orders.?[status.name() == 'NEW' or status.name() == 'ASSIGNED']}">
+  <h2>Актуальные</h2>
+  <p th:if="${active.isEmpty()}">Нет актуальных заказов.</p>
+  <form th:action="@{/orders/route}" method="get">
+    <div class="order-line" th:each="order : ${active}">
+      <input th:if="${order.status.name() == 'NEW'}" type="checkbox" name="selected" th:value="${order.id}" th:aria-label="|Выбрать заказ № ${order.number}|">
+      <span th:if="${order.status.name() != 'NEW'}" aria-hidden="true"></span>
+      <a class="row" th:href="@{/orders/{number}(number=${order.number})}">
+      <strong th:text="|№ ${order.number}|"></strong>
+      <span th:text="${order.addressText}"></span>
+      <span class="status" th:text="${order.status.name() == 'NEW' ? 'Новый' : order.status.name() == 'ASSIGNED' ? 'Назначен' : order.status.name() == 'IN_DELIVERY' ? 'В доставке' : 'Завершен'}"></span>
+    </a>
+    </div>
+    <button th:if="${!active.?[status.name() == 'NEW'].isEmpty()}">Создать маршрут</button>
+  </form>
+  <hr>
+  <h2>Отправлены</h2>
+  <p th:if="${orders.?[status.name() == 'IN_DELIVERY'].isEmpty()}">Нет заказов в доставке.</p>
+  <th:block th:each="order : ${orders.?[status.name() == 'IN_DELIVERY']}">
+<a class="row" th:href="@{/orders/{number}(number=${order.number})}">
+      <strong th:text="|№ ${order.number}|"></strong>
+      <span th:text="${order.addressText}"></span>
+      <span class="status" th:text="${order.status.name() == 'NEW' ? 'Новый' : order.status.name() == 'ASSIGNED' ? 'Назначен' : order.status.name() == 'IN_DELIVERY' ? 'В доставке' : 'Завершен'}"></span>
+    </a>
+</th:block>
+  <hr>
+  <details th:open="${!number.isEmpty()}">
+    <summary>Завершенные</summary>
+    <p th:if="${orders.?[status.name() == 'COMPLETED'].isEmpty()}">Нет завершенных заказов.</p>
+    <th:block th:each="order : ${orders.?[status.name() == 'COMPLETED']}">
+<a class="row" th:href="@{/orders/{number}(number=${order.number})}">
+      <strong th:text="|№ ${order.number}|"></strong>
+      <span th:text="${order.addressText}"></span>
+      <span class="status" th:text="${order.status.name() == 'NEW' ? 'Новый' : order.status.name() == 'ASSIGNED' ? 'Назначен' : order.status.name() == 'IN_DELIVERY' ? 'В доставке' : 'Завершен'}"></span>
+    </a>
+</th:block>
+  </details>
+</section>
+</main></body></html>

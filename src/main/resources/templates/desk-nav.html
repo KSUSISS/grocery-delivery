@@ -1,0 +1,11 @@
+<aside class="side-nav" th:fragment="menu" aria-label="Разделы диспетчерской">
+  <a class="side-brand" href="/orders">КСтолу</a>
+  <nav class="side-links">
+    <a href="/orders">Заказы</a>
+    <a href="/orders/new">Новый заказ</a>
+    <a href="/orders/couriers">Список курьеров</a>
+    <a href="/orders/couriers/new">Добавить курьера</a>
+    <a href="/orders/reports">Отчеты</a>
+  </nav>
+  <form th:action="@{/logout}" method="post"><button class="secondary">Выйти</button></form>
+</aside>

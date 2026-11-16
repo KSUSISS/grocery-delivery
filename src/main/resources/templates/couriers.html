@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Курьеры — КСтолу</title><link rel="stylesheet" href="/orders.css"></head>
+<body class="desk"><aside th:replace="~{desk-nav :: menu}"></aside>
+<main>
+<div class="courier-heading">
+  <h1>Курьеры</h1>
+  <a class="add-courier" href="/orders/couriers/new">Добавить курьера</a>
+</div>
+<p class="message" role="status" th:if="${notice}" th:text="${notice}"></p>
+<p class="message" role="alert" th:if="${error}" th:text="${error}"></p>
+<p th:if="${couriers.isEmpty()}">Курьеров пока нет.</p>
+<section class="panel" th:each="entry : ${couriers}">
+  <h2 th:text="|${entry.courier.lastName} ${entry.courier.firstName} ${entry.courier.patronymic}|"></h2>
+  <p th:text="${entry.courier.onShift ? 'На смене' : 'Вне смены'}"></p>
+  <form th:action="@{/orders/couriers/{id}/shift(id=${entry.courier.id})}" method="post">
+    <input type="hidden" name="open" th:value="${!entry.courier.onShift}">
+    <button class="secondary" th:text="${entry.courier.onShift ? 'Завершить смену' : 'Открыть смену'}"></button>
+  </form>
+  <p th:if="${entry.courier.onShift and entry.queue.isEmpty()}">Очередь пуста.</p>
+  <p th:if="${entry.courier.onShift}"><a th:href="@{/orders/couriers/{id}/route(id=${entry.courier.id})}">Открыть очередь и маршрут</a></p>
+
+</section>
+</main></body></html>

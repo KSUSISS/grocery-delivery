@@ -12,6 +12,10 @@ public class DeliveryAssignment extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "shift_id") private CourierShift shift;
     @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "assigned_by") private UserAccount assignedBy;
     @Column(nullable = false) private Instant assignedAt = Instant.now();
+    @Column(nullable = false) private long queuePosition;
+
+    private Integer confirmedMeters;
+    private Instant deliveredAt;
     private Instant dispatchedAt;
     @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "dispatched_by") private UserAccount dispatchedBy;
     private Instant releasedAt;

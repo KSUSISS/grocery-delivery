@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Новый заказ — КСтолу</title><link rel="stylesheet" href="/orders.css"><script src="/order-address.js" defer></script></head>
+<body class="desk"><aside th:replace="~{desk-nav :: menu}"></aside><main>
+<h1>Новый заказ</h1>
+<p class="message" role="alert" th:if="${error}" th:text="${error}"></p>
+<section class="panel">
+
+<form class="fields" th:action="@{/orders}" method="post">
+  <label>Получатель<input name="recipientName" required maxlength="120"></label>
+  <label>Телефон<input name="recipientPhone" type="tel" required maxlength="25" placeholder="+7 900 000-00-00"></label>
+  <label>Улица<input name="street" required maxlength="250" autocomplete="address-line1"></label>
+  <label>Дом<input name="house" required maxlength="80"></label>
+  <label id="entrance-field">Подъезд (если известен)<input name="entrance" maxlength="40"></label>
+  <label id="apartment-field">Квартира<input name="apartment" required maxlength="80"></label>
+  <label>Тип жилья<select name="addressType" required><option value="APARTMENT">Квартира</option><option value="PRIVATE_HOUSE">Частный дом</option></select></label>
+  <label>Время доставки по Москве<input name="due" type="datetime-local" required></label>
+  <label>Комментарий<textarea name="comment" rows="2" maxlength="500"></textarea></label>
+  <button>Создать заказ</button>
+</form>
+</section>
+</main></body></html>

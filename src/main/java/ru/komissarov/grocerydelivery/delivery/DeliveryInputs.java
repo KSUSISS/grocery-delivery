@@ -12,6 +12,11 @@ public final class DeliveryInputs {
         @NotBlank @Size(max=60) String patronymic,
         @NotBlank @Size(max=25) String phone,
         @Min(1) @Max(120) int ageYears) {}
+    public record AddressCorrection(
+        @NotBlank @Size(max = 500) String addressText,
+        @NotNull AddressType addressType,
+        @NotBlank @Size(max = 500) String reason) {}
+
     public record OrderInput(
         @NotBlank @Size(max=120) String recipientName,
         @NotBlank @Size(max=25) String recipientPhone,
